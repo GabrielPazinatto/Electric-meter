@@ -204,7 +204,6 @@ get_tension PROC NEAR
 	mov flag_v, 0
 	mov exit_code, 0
 
-
 	call get_argv_pointer
 	call get_file_name
 	call get_output_file_name
