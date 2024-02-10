@@ -1,0 +1,11 @@
+ .MODEL small
+
+.STACK 1024
+
+.DATA
+
+.CODE
+
+.STARTUP
+
+.EXIT 0
