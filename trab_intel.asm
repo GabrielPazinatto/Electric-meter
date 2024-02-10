@@ -9,10 +9,15 @@
 	end_of_string			EQU 00H ;'\0'
 	space					EQU 20H ;' '
 
+	CRLF					DB CR,LF
+
 	flag_i					DB 0
 	flag_o					DB 0
 	flag_v					DB 0
 	exit_code				DB 0
+
+	input_file_handle 		DW 0
+	output_file_handle		DW 0
 
 	prompt					DB 100 DUP(end_of_string)
 	in_buffer				DB 100 DUP(?)
@@ -24,12 +29,15 @@
 	default_input_file_name DB "a.in",end_of_string
 	default_output_file_name DB "a.out",end_of_string
 
-	msg_error_open_file		DB "Arquivo nao pode ser aberto.", end_of_string
+	msg_error_open_input_file		DB "Arquivo de entrada nao pode ser aberto.", end_of_string
 	msg_error_invalid_voltage DB "Valor de tensao incorreta.", end_of_string
-
+	msg_error_open_output_file   DB "Arquivo de saida nao pode ser aberto.", end_of_string
+	msg_error_couldnt_create_output DB "Arquivo de saida nao pode ser criado.", end_of_string
 
 .CODE
 
+
+;----------------------------------------------
 ;di <- destiny
 ;si <- source
 
@@ -50,6 +58,12 @@ strcpy_s PROC NEAR
 		mov [di], end_of_string
 		ret
 		strcpy_s ENDP
+
+;----------------------------------------------
+
+
+
+
 
 ;----------------------------------------------
 get_argv PROC NEAR
@@ -101,6 +115,10 @@ get_argv PROC NEAR
 	printf_s	endp
 
 ;----------------------------------------------
+
+
+
+;----------------------------------------------
 get_tension PROC NEAR
 	lea si, in_buffer
 
@@ -134,6 +152,8 @@ get_tension PROC NEAR
 		ret
 		get_tension ENDP
 
+;----------------------------------------------
+
 get_output_file_name PROC NEAR
 	lea si, in_buffer
 
@@ -151,8 +171,8 @@ get_output_file_name PROC NEAR
 
 		possible_argument2:
 			inc si
-			mov ah, [si]
-			cmp ah, 'o'
+			mov al, [si]
+			cmp al, 'o'
 
 			je output_name_found
 			jmp output_file_name_loop
@@ -168,12 +188,17 @@ get_output_file_name PROC NEAR
 		output_name_found:
 			inc si
 			inc si
+
+			mov al, [si]
+
 			lea di, output_file_name
 			call strcpy_s
 	
 	ret_get_output_name:
 		ret
 		get_output_file_name ENDP
+
+;----------------------------------------------
 
 get_file_name PROC NEAR
 	lea	si,	in_buffer
@@ -218,20 +243,21 @@ get_file_name PROC NEAR
 			ret
 	get_file_name ENDP
 
+;----------------------------------------------
 
-open_file PROC NEAR
+open_input_file PROC NEAR
 	test al, al
 
-	mov al, 0
+	mov al, 0							;abre no modo de leitura
 	mov ah, 3dh
 	int 21H
 	mov bx, ax
 
-	jc perror_open_file
+	jc perror_open_input_file
 	ret
 
-	perror_open_file:
-		lea bx, msg_error_open_file
+	perror_open_input_file:
+		lea bx, msg_error_open_input_file
 		call printf_s
 
 		mov ah, 4ch
@@ -239,7 +265,55 @@ open_file PROC NEAR
 		int 21h
 	
 	ret
-	open_file ENDP
+	open_input_file ENDP
+
+;----------------------------------------------
+
+open_output_file PROC NEAR
+	test al, al
+
+	mov al, 1							;abre no modo de escrita
+	mov ah, 3dh
+	int 21H
+	mov bx, ax
+
+	jc try_create_output
+	retry:
+
+	jc perror_open_output_file
+	ret
+
+	try_create_output:
+		call create_output_file
+		jmp retry
+
+	perror_open_output_file:
+		lea bx, msg_error_open_output_file
+		call printf_s
+
+		mov ah, 4ch
+		mov al, 1
+		int 21h
+	
+	ret
+	open_output_file ENDP
+
+;----------------------------------------------
+
+create_output_file PROC NEAR
+	test al, al
+	
+	lea dx, output_file_name
+	mov cx,	0
+	mov ah, 3ch
+	int 21H
+
+	mov ax, output_file_handle
+	ret
+
+	create_output_file ENDP
+
+;----------------------------------------------
 
 atoi	proc near
 		; A = 0;
@@ -265,6 +339,8 @@ atoi_1:
 		; return
 		ret
 atoi	endp
+
+;----------------------------------------------
 
 check_voltage PROC NEAR
 	mov ax, voltage
@@ -295,7 +371,9 @@ check_voltage PROC NEAR
 		ret
 
 	check_voltage ENDP
-	
+
+;----------------------------------------------
+
 .STARTUP
 
 	;-----------------------------getting input
@@ -314,7 +392,10 @@ check_voltage PROC NEAR
 	;-----------------------------checking input
 
 	lea dx, input_file_name
-	call open_file
+	call open_input_file
+
+	lea dx, output_file_name
+	call open_output_file
 
 	call check_voltage
 
