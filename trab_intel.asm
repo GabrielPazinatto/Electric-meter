@@ -11,6 +11,7 @@
 
 	CRLF					DB CR,LF
 
+	counter 				DW 0
 	flag_i					DB 0
 	flag_o					DB 0
 	flag_v					DB 0
@@ -19,12 +20,19 @@
 	input_file_handle 		DW 0
 	output_file_handle		DW 0
 
+	str_voltage_num			DB 4 DUP(end_of_string)
+	char_buffer				DB 0
+	input_file_line_vector  DB 10 DUP(end_of_string)
+	input_file_line			DB 100 DUP(end_of_string)
 	prompt					DB 100 DUP(end_of_string)
 	in_buffer				DB 100 DUP(?)
 	input_file_name			DB 100 DUP(end_of_string)
 	output_file_name		DB 100 DUP(end_of_string)
 	voltage_atoi            DB 10 DUP(end_of_string)
 	voltage					Dw 0
+
+	str_127					db "127",end_of_string
+	str_220					db "220",end_of_string
 
 	default_input_file_name DB "a.in",end_of_string
 	default_output_file_name DB "a.out",end_of_string
@@ -62,7 +70,12 @@ strcpy_s PROC NEAR
 ;----------------------------------------------
 
 
-
+terminate PROC NEAR
+	mov ah, 4ch
+	mov al, 0
+	int 21H
+	ret
+	terminate ENDP
 
 
 ;----------------------------------------------
@@ -126,7 +139,7 @@ get_tension PROC NEAR
 		mov ah, [si]
 
 		cmp ah, end_of_string
-		JE ret_get_tension
+		JE voltage_not_found
 
 		cmp ah, '-'
 		JE	possible_argument3
@@ -146,6 +159,13 @@ get_tension PROC NEAR
 			inc si
 			lea di, voltage_atoi
 
+			call strcpy_s
+			jmp ret_get_tension
+
+		voltage_not_found:
+			mov voltage, 127
+			lea di, voltage_atoi
+			lea si, str_127
 			call strcpy_s
 
 	ret_get_tension:
@@ -247,7 +267,6 @@ get_file_name PROC NEAR
 
 open_input_file PROC NEAR
 	test al, al
-
 	mov al, 0							;abre no modo de leitura
 	mov ah, 3dh
 	int 21H
@@ -291,9 +310,7 @@ open_output_file PROC NEAR
 		lea bx, msg_error_open_output_file
 		call printf_s
 
-		mov ah, 4ch
-		mov al, 1
-		int 21h
+		call terminate
 	
 	ret
 	open_output_file ENDP
@@ -342,35 +359,111 @@ atoi	endp
 
 ;----------------------------------------------
 
-check_voltage PROC NEAR
+check_voltage_input PROC NEAR
+	push ax
 	mov ax, voltage
-	cmp voltage, 116
-	JNA	invalid_voltage
 
-	cmp voltage, 137
-	JA test_220
-	jmp valid_voltage
+	cmp ax, 127
+	je ret_check_voltage
+	cmp ax, 220
+	je ret_check_voltage
 
-	test_220:
-		cmp voltage, 209
-		JNA invalid_voltage
-
-		cmp voltage, 230
-		JA invalid_voltage
-		JMP valid_voltage
+	jmp invalid_voltage
 
 	invalid_voltage:
 		lea bx, msg_error_invalid_voltage
 		call printf_s
+		call terminate
 
-		mov ah, 4ch
-		mov al, 1
-		int 21h
-	
-	valid_voltage:
+	ret_check_voltage:
 		ret
 
-	check_voltage ENDP
+	check_voltage_input ENDP
+
+;----------------------------------------------
+ascii_is_int PROC NEAR ;di <- char
+                       ;si <- 1 se representar um numero, 0 caso contrario
+	cmp di, 49
+	jb not_ascii
+	cmp di, 57
+	ja not_ascii
+
+	mov si, 1
+	ret
+
+	not_ascii:
+		mov si, 0
+		ret
+
+	ascii_is_int ENDP
+
+
+;----------------------------------------------
+recede_file_pointer PROC NEAR ;retrocede o ponteiro de leitura de arquivo em uma posiçao
+	push ax
+	push cx
+	push dx
+	
+	mov ah, 42h
+	mov al, 1
+	mov cx, 0
+	mov dx, -1
+	int 21H
+
+	pop dx
+	pop cx
+	pop ax
+
+	ret
+	recede_file_pointer ENDP
+
+;----------------------------------------------
+
+read_3_bytes PROC NEAR
+	push cx
+
+	mov cx, 3
+	;lea dx, str_voltage_num
+	int 21H
+
+	pop cx
+	ret
+	read_3_bytes ENDP
+
+;----------------------------------------------
+get_input_line PROC NEAR      ;pega varios caracteres do arquivo
+	mov ah, 3fh
+	mov cx, 50
+	mov bx, input_file_handle
+	lea dx, input_file_line
+	int 21H
+	lea bx, input_file_line
+	loop_find_endline:              ;quando achar a quebra de linha, finaliza a string com \0
+		
+		mov al, [bx]
+
+		cmp al, end_of_string
+		je end_get_line
+		cmp al, CR
+		je end_get_line
+		cmp al, LF
+		je end_get_line
+
+		inc bx
+		jmp loop_find_endline
+
+	end_get_line:
+		mov byte ptr[bx], end_of_string
+		ret
+
+get_input_line ENDP
+
+;----------------------------------------------
+get_voltages_in_txt_line PROC NEAR
+	
+
+
+
 
 ;----------------------------------------------
 
@@ -393,11 +486,19 @@ check_voltage PROC NEAR
 
 	lea dx, input_file_name
 	call open_input_file
+	mov input_file_handle, bx
 
 	lea dx, output_file_name
 	call open_output_file
+	mov output_file_handle, bx
 
-	call check_voltage
+	call check_voltage_input
+
+	;-----------------------------
+
+	call get_input_line
+	lea bx, input_file_line
+	call printf_s
 
 	;-----------------------------processing
 
@@ -409,7 +510,6 @@ check_voltage PROC NEAR
 
 	lea bx, input_file_name
 	call printf_s
-
 
 
 .EXIT 0
