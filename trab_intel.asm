@@ -1,5 +1,4 @@
-.MODEL small
-
+.MODEL large
 .STACK 1024
 
 .DATA
@@ -11,25 +10,36 @@
 
 	CRLF					DB CR,LF
 
+	num_count				dw 0
 	counter 				DW 0
 	flag_i					DB 0
 	flag_o					DB 0
 	flag_v					DB 0
 	exit_code				DB 0
 
+	read_bytes				dw 0
 	input_file_handle 		DW 0
 	output_file_handle		DW 0
 
-	str_voltage_num			DB 4 DUP(end_of_string)
-	char_buffer				DB 0
+	char					db 2 DUP(0)
+	input_file_line         db 1000 DUP(0)
+	
 	input_file_line_vector  DB 10 DUP(end_of_string)
-	input_file_line			DB 100 DUP(end_of_string)
 	prompt					DB 100 DUP(end_of_string)
 	in_buffer				DB 100 DUP(?)
 	input_file_name			DB 100 DUP(end_of_string)
 	output_file_name		DB 100 DUP(end_of_string)
 	voltage_atoi            DB 10 DUP(end_of_string)
 	voltage					Dw 0
+	next					dw 0
+
+	str_voltage_1			db 4 DUP(0)
+	str_voltage_2			db 4 DUP(0)
+	str_voltage_3			db 4 DUP(0)
+
+	voltage_1				DW 0
+	voltage_2				DW 0
+	voltage_3				DW 0
 
 	str_127					db "127",end_of_string
 	str_220					db "220",end_of_string
@@ -122,7 +132,10 @@ get_argv PROC NEAR
 		jmp		printf_s
 			
 	ps_1:
-
+		mov dl, LF
+		int 21H
+		mov dl, cr
+		int 21h
 		ret
 		
 	printf_s	endp
@@ -381,11 +394,21 @@ check_voltage_input PROC NEAR
 	check_voltage_input ENDP
 
 ;----------------------------------------------
-ascii_is_int PROC NEAR ;di <- char
+advance_file_pointer PROC NEAR ;dx <- numero de bytes para avançar
+	mov ah, 42h
+	mov al, 1
+	mov bx, input_file_handle
+	mov cx, 0
+	int 21H
+	ret
+
+advance_file_pointer ENDP
+;----------------------------------------------
+ascii_is_int PROC NEAR ;dl <- char
                        ;si <- 1 se representar um numero, 0 caso contrario
-	cmp di, 49
+	cmp dl, 49
 	jb not_ascii
-	cmp di, 57
+	cmp dl, 57
 	ja not_ascii
 
 	mov si, 1
@@ -397,72 +420,94 @@ ascii_is_int PROC NEAR ;di <- char
 
 	ascii_is_int ENDP
 
-
 ;----------------------------------------------
-recede_file_pointer PROC NEAR ;retrocede o ponteiro de leitura de arquivo em uma posiçao
+letter_is_in_string PROC NEAR 		  ; dl <- char
 	push ax
-	push cx
-	push dx
-	
-	mov ah, 42h
-	mov al, 1
-	mov cx, 0
-	mov dx, -1
-	int 21H
+	push si                			  ; dh <- 1 se estiver, 0 caso contrario
+	mov si, 0						  ; bx <- ponteiro para string
+	loop_search_char:
+		mov al, [bx+si]
 
-	pop dx
-	pop cx
-	pop ax
+		cmp al, 0
+		je char_not_found
 
-	ret
-	recede_file_pointer ENDP
-
-;----------------------------------------------
-
-read_3_bytes PROC NEAR
-	push cx
-
-	mov cx, 3
-	;lea dx, str_voltage_num
-	int 21H
-
-	pop cx
-	ret
-	read_3_bytes ENDP
-
-;----------------------------------------------
-get_input_line PROC NEAR      ;pega varios caracteres do arquivo
-	mov ah, 3fh
-	mov cx, 50
-	mov bx, input_file_handle
-	lea dx, input_file_line
-	int 21H
-	lea bx, input_file_line
-	loop_find_endline:              ;quando achar a quebra de linha, finaliza a string com \0
+		cmp al, dl
+		je char_found
 		
-		mov al, [bx]
+		inc si
+		jmp loop_search_char 
 
-		cmp al, end_of_string
+	char_not_found:
+		mov dh, 0
+		pop si
+		pop ax
+		ret
+	
+	char_found:
+		mov dh, 1
+		pop si
+		pop ax
+		ret
+	ret
+
+letter_is_in_string ENDP
+
+
+;----------------------------------------------
+
+get_input_text PROC NEAR
+	mov ah, 3fh
+	mov cx, 10000
+	mov bx, input_file_handle
+	;lea dx, input_text
+	int 21h
+	ret
+
+get_input_text ENDP
+
+;----------------------------------------------
+;----------------------------------------------
+getline PROC NEAR
+
+	mov counter, 0
+
+	getchar_loop:
+		mov ah, 3fh
+		mov cx, 1
+		lea dx, char
+		mov bx, input_file_handle
+
+		test ax, ax
+		int 21H
+		mov read_bytes, ax
+		jc end_get_line
+
+		push bx
+
+		mov dl, char
+		
+		;cmp dl, 0
+		;je end_get_line
+		cmp dl, 0AH
 		je end_get_line
-		cmp al, CR
-		je end_get_line
-		cmp al, LF
+		cmp dl, 0DH
 		je end_get_line
 
-		inc bx
-		jmp loop_find_endline
+		lea bx, input_file_line
+		add bx, counter
+
+		mov byte ptr [bx], dl
+		pop bx
+
+		inc counter
+		jmp getchar_loop
 
 	end_get_line:
-		mov byte ptr[bx], end_of_string
+		mov byte ptr [bx+1], end_of_string
+		mov dx, 1
+		call advance_file_pointer
 		ret
-
-get_input_line ENDP
-
-;----------------------------------------------
-get_voltages_in_txt_line PROC NEAR
-	
-
-
+getline ENDP
 
 
 ;----------------------------------------------
@@ -496,20 +541,34 @@ get_voltages_in_txt_line PROC NEAR
 
 	;-----------------------------
 
-	call get_input_line
-	lea bx, input_file_line
-	call printf_s
+read_line:
+
+	call getline                  ;le uma linha do input
+
+	lea bx, input_file_line       ;se tiver a letra f, é por que esta escrito fim
+	mov dl, 'f'            
+	call letter_is_in_string
+	cmp dh, 1
+	je end_read_line              ;entao para de ler o arquivo
+	
+	;lea bx, input_file_line
+	;call printf_s
+
+	cmp read_bytes, 0
+	jne read_line
+
+	end_read_line:
 
 	;-----------------------------processing
 
-	lea bx, voltage_atoi
-	call printf_s
+	;lea bx, voltage_atoi
+	;call printf_s
 
-	lea bx, output_file_name
-	call printf_s
+	;lea bx, output_file_name
+	;call printf_s
 
-	lea bx, input_file_name
-	call printf_s
+	;lea bx, input_file_name
+	;call printf_s
 
 
 .EXIT 0
