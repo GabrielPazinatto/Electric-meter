@@ -1,45 +1,53 @@
-.MODEL large
-.STACK 1024
-
+.MODEL small
+.STACK 4096
 .DATA
 
+	comma                   EQU 44
 	LF						EQU 0AH ;line feed
 	CR						EQU 0DH ;carriage return
 	end_of_string			EQU 00H ;'\0'
 	space					EQU 20H ;' '
 
 	CRLF					DB CR,LF
+	str_CRLF				DB CR,LF,end_of_string
+	sw_n	dw	0 							; Usada dentro da funcao sprintf_w
+	sw_f	db	0							; Usada dentro da funcao sprintf_w
+	sw_m	dw	0							; Usada dentro da funcao sprintf_w
+                   
+	counter 				DW 0            ; Usada em varias funçoes como contador
+	read_bytes				dw 0            ; Quantidade de bytes lidos a cada chamado da funçao getline
+	input_file_handle 		DW 0            ; handle do arquivo de entrada
+	output_file_handle		DW 0            ; handle do arquivo de saida
 
-	num_count				dw 0
-	counter 				DW 0
-	flag_i					DB 0
-	flag_o					DB 0
-	flag_v					DB 0
-	exit_code				DB 0
+	input_file_is_invalid 	dw 0
 
-	read_bytes				dw 0
-	input_file_handle 		DW 0
-	output_file_handle		DW 0
+	char					db 0            ; Armazena um char
+	input_file_line         db 1000 DUP(0)  ; Armazena uma linha do arquivo
 
-	char					db 2 DUP(0)
-	input_file_line         db 1000 DUP(0)
+	bad_voltage_count		dw -1
+	no_voltage_count		dw -1
+	line_count				dw -1
+	str_line_count          DB 5 DUP(end_of_string), end_of_string
 	
-	input_file_line_vector  DB 10 DUP(end_of_string)
-	prompt					DB 100 DUP(end_of_string)
-	in_buffer				DB 100 DUP(?)
-	input_file_name			DB 100 DUP(end_of_string)
-	output_file_name		DB 100 DUP(end_of_string)
-	voltage_atoi            DB 10 DUP(end_of_string)
-	voltage					Dw 0
-	next					dw 0
+	in_buffer				DB 100 DUP(?)               ; Armazena os argumentos de entrada
+	input_file_name			DB 100 DUP(end_of_string)   ; Nome do arquivo de entrada
+	output_file_name		DB 100 DUP(end_of_string)   ; nome do arquivo de saida
+	voltage_atoi            DB 10 DUP(end_of_string)    ; string da voltagem
+	voltage					Dw 0                        ; voltagem
+	max_voltage				dw 0
+	min_voltage				dw 0
 
-	str_voltage_1			db 4 DUP(0)
-	str_voltage_2			db 4 DUP(0)
-	str_voltage_3			db 4 DUP(0)
+	str_voltage_1			db 10 DUP(0)                 ; string da primeira voltagem lida em cada linha
+	str_voltage_2			db 10 DUP(0)                 ; string da segunda voltagem lida em cada linha
+	str_voltage_3			db 10 DUP(0)                 ; string da terceira voltagem lida em cada linha
 
-	voltage_1				DW 0
-	voltage_2				DW 0
-	voltage_3				DW 0
+	first_is_int			dw 0     ;usadas na funçao de busca por espaço entre numeros
+	second_is_space			dw 0
+	third_is_int			dw 0
+
+	voltage_1				DW 0     ; Primeira voltagem encontrada em cada linha
+	voltage_2				DW 0     ; Segunda
+	voltage_3				DW 0     ; Terceira
 
 	str_127					db "127",end_of_string
 	str_220					db "220",end_of_string
@@ -51,6 +59,15 @@
 	msg_error_invalid_voltage DB "Valor de tensao incorreta.", end_of_string
 	msg_error_open_output_file   DB "Arquivo de saida nao pode ser aberto.", end_of_string
 	msg_error_couldnt_create_output DB "Arquivo de saida nao pode ser criado.", end_of_string
+	msg_error_couldnt_close_file DB "Nao foi possivel fechar um dos arquivos.", end_of_string
+
+	msg_space DB " ", end_of_string
+	msg_linha DB "Linha ",end_of_string
+	msg_invalido DB "Invalida: ", end_of_string
+
+	msg_input DB "-i ",end_of_string
+	msg_voltage DB "-v ",end_of_string
+	msg_output DB "-o ", end_of_string
 
 .CODE
 
@@ -132,13 +149,41 @@ get_argv PROC NEAR
 		jmp		printf_s
 			
 	ps_1:
-		mov dl, LF
-		int 21H
+		mov	ah,2
 		mov dl, cr
 		int 21h
+
+		mov	ah,2
+		mov dl, LF
+		int 21H
 		ret
 		
 	printf_s	endp
+
+;----------------------------------------------
+	printf	proc	near
+
+	;	While (*s!='\0') {
+		mov		dl,[bx]
+		cmp		dl,0
+		je		ps_1_2
+
+	;		putchar(*s)
+		push	bx
+		mov		ah,2
+		int		21H
+		pop		bx
+
+	;		++s;
+		inc		bx
+			
+	;	}
+		jmp		printf
+			
+	ps_1_2:
+		ret
+		
+	printf	endp
 
 ;----------------------------------------------
 
@@ -377,9 +422,9 @@ check_voltage_input PROC NEAR
 	mov ax, voltage
 
 	cmp ax, 127
-	je ret_check_voltage
+	je ret_check_voltage_127
 	cmp ax, 220
-	je ret_check_voltage
+	je ret_check_voltage_220
 
 	jmp invalid_voltage
 
@@ -388,7 +433,18 @@ check_voltage_input PROC NEAR
 		call printf_s
 		call terminate
 
-	ret_check_voltage:
+	ret_check_voltage_127:
+		lea si, max_voltage
+		mov [si], 137
+		lea si, min_voltage
+		mov [si], 117
+		ret
+
+	ret_check_voltage_220:
+		lea si, max_voltage
+		mov [si], 230
+		lea si, min_voltage
+		mov [si], 210
 		ret
 
 	check_voltage_input ENDP
@@ -406,7 +462,7 @@ advance_file_pointer ENDP
 ;----------------------------------------------
 ascii_is_int PROC NEAR ;dl <- char
                        ;si <- 1 se representar um numero, 0 caso contrario
-	cmp dl, 49
+	cmp dl, 48
 	jb not_ascii
 	cmp dl, 57
 	ja not_ascii
@@ -421,7 +477,7 @@ ascii_is_int PROC NEAR ;dl <- char
 	ascii_is_int ENDP
 
 ;----------------------------------------------
-letter_is_in_string PROC NEAR 		  ; dl <- char
+letter_is_in_string PROC NEAR 		  ; dl <- char 
 	push ax
 	push si                			  ; dh <- 1 se estiver, 0 caso contrario
 	mov si, 0						  ; bx <- ponteiro para string
@@ -509,67 +565,536 @@ getline PROC NEAR
 		ret
 getline ENDP
 
+;----------------------------------------------
+close_file PROC NEAR ; <- bx file handle
+	mov ah, 3EH
+	
+	cmp bx, 0 ;;aparentemente usar essa int com bx == 0 fecha o stdin?
+	je not_close
+
+	test ax, ax
+	int 21H
+	jc not_close
+	ret
+
+	not_close:
+		lea bx, msg_error_couldnt_close_file
+		call printf_s
+		ret
+
+	close_file ENDP
+
+;----------------------------------------------
+get_voltage_readings PROC NEAR
+	lea bx, input_file_line
+	mov counter, 0
+
+	lea di, str_voltage_1
+	voltage_reading_loop_1:
+		mov byte ptr dl, [bx]
+
+		cmp dl, 0
+		je end_reading_voltage
+
+		call ascii_is_int
+		cmp si, 1
+		je get_reading_1
+		inc bx
+		jmp voltage_reading_loop_1
+		get_reading_1:
+			mov byte ptr [di], dl			
+			inc bx
+			inc di
+			mov byte ptr dl, [bx]
+
+			cmp dl,0
+			je end_reading_voltage
+
+			call ascii_is_int
+			cmp si, 1
+			je get_reading_1
+
+			mov [di+1], end_of_string
+
+			lea di, str_voltage_2
+			jmp voltage_reading_loop_2
+
+	voltage_reading_loop_2:
+		mov byte ptr dl, [bx]
+
+		cmp dl,0
+		je end_reading_voltage
+		cmp dl,cr
+		je end_reading_voltage
+		cmp dl,LF
+		je end_reading_voltage
+
+		call ascii_is_int
+		cmp si, 1
+		je get_reading_2
+		inc bx
+		jmp voltage_reading_loop_2
+		get_reading_2:
+			mov byte ptr [di], dl			
+			inc bx
+			inc di
+			mov byte ptr dl, [bx]
+
+			cmp dl,0
+			je end_reading_voltage
+			cmp dl,cr
+			je end_reading_voltage
+			cmp dl,LF
+			je end_reading_voltage
+
+			call ascii_is_int
+			cmp si, 1
+			je get_reading_2
+
+			mov [di+1], end_of_string
+			lea di, str_voltage_3
+			jmp voltage_reading_loop_3
+
+	voltage_reading_loop_3:
+		mov byte ptr dl, [bx]
+
+		cmp dl,0
+		je end_reading_voltage
+		cmp dl,cr
+		je end_reading_voltage
+		cmp dl,LF
+		je end_reading_voltage
+
+		call ascii_is_int
+		cmp si, 1
+		je get_reading_3
+		inc bx
+		jmp voltage_reading_loop_3
+		get_reading_3:
+			mov byte ptr [di], dl			
+			inc bx
+			inc di
+			mov byte ptr dl, [bx]
+
+			cmp dl,0
+			je end_reading_voltage
+
+			call ascii_is_int
+			cmp si, 1
+			je get_reading_3
+			mov [di+1], end_of_string
+	end_reading_voltage:
+		ret
+get_voltage_readings ENDP
+
+;----------------------------------------------
+convert_readings_to_int PROC NEAR
+	lea bx, str_voltage_1
+	call atoi
+	mov voltage_1, ax
+
+	lea bx, str_voltage_2
+	call atoi
+	mov voltage_2, ax
+
+	lea bx, str_voltage_3
+	call atoi
+	mov voltage_3, ax
+
+	ret
+convert_readings_to_int ENDP
+
+;----------------------------------------------
+check_invalid_line PROC NEAR
+	mov si, 0
+	mov cx, 0
+
+	count_commas:
+		lea bx, input_file_line
+		mov dl, byte [bx+si]
+
+		cmp dl, 0
+		je stop_counting_c
+
+		cmp dl, comma
+		je found_comma
+		
+		inc si
+		jmp count_commas
+
+		found_comma:
+			inc cx
+			inc si
+			jmp count_commas
+
+		stop_counting_c:
+			cmp cx, 2
+			jne wrong_val
+
+
+	mov dx, voltage_1
+	cmp voltage_1, 499
+	ja wrong_val
+
+	mov dx, voltage_2
+	cmp	dx, 499
+	ja wrong_val
+
+	mov dx, voltage_3
+	cmp dx, 499
+	ja wrong_val
+
+	correct_val:
+		mov ax, 0
+		ret
+	wrong_val:
+		mov ax, 1
+		ret
+check_invalid_line ENDP
+
+;----------------------------------------------
+sprintf_w	proc	near
+;void sprintf_w(char *string, WORD n) {
+	mov		sw_n,ax
+;	k=5;
+	mov		cx,5
+;	m=10000;
+	mov		sw_m,10000
+;	f=0;
+	mov		sw_f,0
+;	do {
+sw_do:
+;		quociente = n / m : resto = n % m;	// Usar instru��o DIV
+	mov		dx,0
+	mov		ax,sw_n
+	div		sw_m
+;		if (quociente || f) {
+;			*string++ = quociente+'0'
+;			f = 1;
+;		}
+	cmp		al,0
+	jne		sw_store
+	cmp		sw_f,0
+	je		sw_continue
+sw_store:
+	add		al,'0'
+	mov		[bx],al
+	inc		bx
+	mov		sw_f,1
+sw_continue:
+;		n = resto;
+	mov		sw_n,dx
+;		m = m/10;
+	mov		dx,0
+	mov		ax,sw_m
+	mov		bp,10
+	div		bp
+	mov		sw_m,ax
+;		--k;
+	dec		cx
+;	} while(k);
+	cmp		cx,0
+	jnz		sw_do
+;	if (!f)
+;		*string++ = '0';
+	cmp		sw_f,0
+	jnz		sw_continua2
+	mov		[bx],'0'
+	inc		bx
+sw_continua2:
+;	*string = '\0';
+	mov		byte ptr[bx],0
+;}
+	ret
+sprintf_w	endp
+
+;----------------------------------------------
+invalid_line_found PROC NEAR
+	lea bx, msg_linha
+	call printf
+
+	mov ax, line_count
+	lea bx, str_line_count
+	call sprintf_w
+
+	lea bx, str_line_count
+	call printf
+
+	lea bx, msg_space
+	call printf
+
+	lea bx, msg_invalido
+	call printf
+
+	lea bx, input_file_line
+	call printf_s
+
+	inc input_file_is_invalid
+
+	ret
+
+invalid_line_found ENDP
+
+;----------------------------------------------
+clear_voltage_strings PROC NEAR
+	mov counter, 0
+	lea di, str_voltage_1
+	lea si, str_voltage_2
+	lea bx, str_voltage_3
+
+	clear_loop:
+		mov byte ptr [di+counter], 0
+		mov byte ptr [si+counter], 0
+		mov byte ptr [bx+counter], 0
+
+		inc counter
+		cmp counter, 9
+		je end_clear
+		jmp clear_loop
+
+	end_clear:
+		ret
+	clear_voltage_strings ENDP
+
+;----------------------------------------------
+clear_line_input PROC NEAR
+	mov si, 99
+	lea bx, input_file_line
+
+	clear_loop1:
+		mov byte ptr [bx+si], 0
+		dec si
+
+		cmp si, -1
+		je end_clear1
+		jmp clear_loop1
+
+	end_clear1:
+		ret
+
+	clear_line_input ENDP
+;----------------------------------------------
+fprintf PROC NEAR
+	mov ah, 40h
+	mov cx, 1
+	mov bx, output_file_handle
+	ret
+
+fprintf ENDP
 
 ;----------------------------------------------
 
-.STARTUP
+fprintf_s PROC NEAR
+	mov ah, 40h
+	mov cx, 1
+	mov bx, output_file_handle
 
-	;-----------------------------getting input
+	mov ah, 40h
+	mov cx, 1
+	mov bx, output_file_handle
+	lea dx, str_CRLF
+
+	ret
+
+fprintf_s ENDP
+;----------------------------------------------
+
+check_voltage_quality PROC 	NEAR
+	check_no_voltage:
+	cmp voltage_1, 9
+	ja check_bad_voltage
+	cmp voltage_2, 9
+	ja check_bad_voltage
+	cmp voltage_3, 9
+	ja check_bad_voltage
+
+	inc no_voltage_count
+	ret
+
+	check_bad_voltage:
+		mov ax, voltage_1
+		cmp ax, max_voltage
+		ja bad_voltage_found
+		cmp ax, min_voltage
+		jb bad_voltage_found
+
+		mov ax, voltage_2
+		cmp ax, max_voltage
+		ja bad_voltage_found
+		cmp ax, min_voltage
+		jb bad_voltage_found
+
+		mov ax, voltage_3
+		cmp ax, max_voltage
+		ja bad_voltage_found
+		cmp ax, min_voltage
+		jb bad_voltage_found
+
+	end_check_quality:
+		ret
+
+	bad_voltage_found:
+		inc bad_voltage_count
+		ret
+
+
+
+check_voltage_quality ENDP
+
+;----------------------------------------------
+.STARTUP
+	;------------------------------------------------
+	;
+	;	CHECANDO O INPUT E TENTANDO ABRIR OS ARQUIVOS
+	;
+	;------------------------------------------------
+
+	;-----------------------------pegando infos do cmdline
 	lea bx, in_buffer
 	call get_argv
 
 	call get_tension
 	call get_output_file_name
 	call get_file_name
-	;------------------------------converting input
-
+	;------------------------------convertendo voltagem
 	lea bx, voltage_atoi
 	call atoi
 	mov voltage, ax
-	
-	;-----------------------------checking input
-
-	lea dx, input_file_name
+	;-----------------------------checando input
+	lea dx, input_file_name       ;tenta abrir o arquivo de input
 	call open_input_file
 	mov input_file_handle, bx
 
-	lea dx, output_file_name
+	lea dx, output_file_name      ;tenta abrir o arquivo de output
 	call open_output_file
 	mov output_file_handle, bx
 
-	call check_voltage_input
-
-	;-----------------------------
+	call check_voltage_input      ;checa se a tensao informada é valida
+	;------------------------------------------------
+	;
+	;	PROCURANDO LINHAS INVALIDAS NO INPUT
+	;
+	;------------------------------------------------
 
 read_line:
-
-	call getline                  ;le uma linha do input
-
-	lea bx, input_file_line       ;se tiver a letra f, é por que esta escrito fim
+	;----------------------------- limpa as strings lidas
+	call clear_line_input
+	call clear_voltage_strings
+	;----------------------------- le uma linha do input
+	call getline                  
+	inc line_count
+	;----------------------------- se nao tiver sido lido nenhum byte, para de ler o arquivo
+	cmp read_bytes, 0             
+	je end_read_line
+	;----------------------------- ;se tiver a letra f, é por que esta escrito fim
+	lea bx, input_file_line       
 	mov dl, 'f'            
 	call letter_is_in_string
 	cmp dh, 1
 	je end_read_line              ;entao para de ler o arquivo
-	
-	;lea bx, input_file_line
+	;----------------------------- se tiver a letra F, é por que esta escrito FIM
+	lea bx, input_file_line       
+	mov dl, 'F'            
+	call letter_is_in_string
+	cmp dh, 1
+	je end_read_line              ;entao para de ler o arquivo
+	;----------------------------- printa a linha (debug)
+	lea bx, input_file_line
 	;call printf_s
+	;----------------------------- 
+	call get_voltage_readings     ;isola a parte da linha com as leituras
+	call convert_readings_to_int  ;converte as leituras para int
+	call check_invalid_line       ;checa se a linha é invalida
 
-	cmp read_bytes, 0
-	jne read_line
+	cmp ax, 0                     ;se a linha for invalida, informa o usuario e ativa flag de arquivo invalido
+	je valid_line
 
+	call invalid_line_found
+
+	valid_line:
+		jmp read_line             
 	end_read_line:
+		mov dx, input_file_is_invalid ;se alguma linha for invalida, encerra a execuçao
+		cmp dx, 0
+		jna gen_output       ;se nao, gera o arquivo de saida
 
-	;-----------------------------processing
+		call terminate
 
-	;lea bx, voltage_atoi
+		gen_output:
+
+		
+	;------------------------------------------------
+	;
+	;	GERANDO ARQUIVO DE SAIDA
+	;
+	;------------------------------------------------
+
+	mov ah, 42h                ;retorna o ponteiro de arquivo para a posiçao inicial
+	mov al, 0
+	mov bx, input_file_handle
+	mov cx, 0
+	mov dx, 0
+	int 21h
+
+read_line_2:
+
+	;----------------------------- limpa as strings lidas
+	call clear_line_input
+	call clear_voltage_strings
+	;----------------------------- le uma linha do input
+	call getline                  
+	inc line_count
+	;----------------------------- se nao tiver sido lido nenhum byte, para de ler o arquivo
+	cmp read_bytes, 0             
+	je read_line_2_end
+	;----------------------------- ;se tiver a letra f, é por que esta escrito fim
+	lea bx, input_file_line       
+	mov dl, 'f'            
+	call letter_is_in_string
+	cmp dh, 1
+	je read_line_2_end         ;entao para de ler o arquivo
+	;----------------------------- se tiver a letra F, é por que esta escrito FIM
+	lea bx, input_file_line       
+	mov dl, 'F'            
+	call letter_is_in_string
+	cmp dh, 1
+	je read_line_2_end          ;entao para de ler o arquivo
+	;----------------------------- printa a linha (debug)
+	lea bx, input_file_line
 	;call printf_s
+	;----------------------------- 
+	call get_voltage_readings     ;isola a parte da linha com as leituras
+	call convert_readings_to_int  ;converte as leituras para int
+	call check_voltage_quality    ;incrementa os contadores de voltagem ruim, e sem voltagem
 
-	;lea bx, output_file_name
-	;call printf_s
+	;call terminate
 
-	;lea bx, input_file_name
-	;call printf_s
+	jmp read_line_2
 
+	read_line_2_end:
+		lea bx, msg_input
+		call printf
+		lea bx, input_file_name
+		call printf_s
+
+		lea bx, msg_voltage
+		call printf
+		lea bx, voltage_atoi
+		call printf_s
+
+		lea bx, msg_output
+		call printf
+		lea bx, output_file_name
+		call printf_s
+
+		lea bx, str_CRLF
+		call printf
+
+terminate_execution:
+	mov bx, input_file_handle
+	call close_file
+	mov bx, output_file_handle
+	call close_file
 
 .EXIT 0
 
