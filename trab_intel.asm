@@ -2,12 +2,11 @@
 .STACK 4096
 .DATA
 
-	comma                   EQU 44
+	comma                   EQU 44  ; ','
 	LF						EQU 0AH ;line feed
 	CR						EQU 0DH ;carriage return
 	end_of_string			EQU 00H ;'\0'
 	space					EQU 20H ;' '
-
 
 	CRLF					DB CR,LF
 	str_CRLF				DB CR,LF,end_of_string
@@ -20,41 +19,38 @@
 	input_file_handle 		DW 0            ; handle do arquivo de entrada
 	output_file_handle		DW 0            ; handle do arquivo de saida
 
-	one_hour				Dw 3600
-	one_min					DB 60
+	one_hour				Dw 3600         ; "constante", conversao de segundos para hora
+	one_min					DB 60           ; "constante", conversao de segundos para minuto
 
-
-
-	time_h					dw 0
-	time_min				DB 0
-	time_seg				db 0
-	no_time_h				dw 0
-	no_time_min				DB 0
-	no_time_seg				db 0
-	good_time_h				dw 0
-	good_time_min 			db 0
-	good_time_seg            db 0
+	time_h					dw 0 ;quantidade de horas de leitura
+	time_min				DB 0 ;minutos
+	time_seg				db 0 ;segundos
+	no_time_h				dw 0 ;quantidade de horas sem tensao
+	no_time_min				DB 0 ;minutos
+	no_time_seg				db 0 ;segundos
+	good_time_h				dw 0 ;quantidade de horas com tensao adequada
+	good_time_min 			db 0 ;minutos
+	good_time_seg           db 0 ;segundos
 
 	input_file_is_invalid 	dw 0
 
-	str_2					db 10 DUP(0),end_of_string
-	char					db 0            ; Armazena um char
-	input_file_line         db 1000 DUP(0)  ; Armazena uma linha do arquivo
+	str_2					db 10 DUP(0),end_of_string  ;string tmeporaria
+	char					db 0            			; Armazena um char
+	input_file_line         db 1000 DUP(0)  			; Armazena uma linha do arquivo
 
-	no_voltage_count		dw 0
-	good_voltage_count		dw 0
-	bad_voltage_count		dw 0
-	line_count_2			dw 0
-	line_count				dw 0
-	str_line_count          DB 5 DUP(end_of_string), end_of_string
+	no_voltage_count		dw 0 						; contador de segundos sem tensao
+	good_voltage_count		dw 0						; contador de segundos com tensao adequada
+	bad_voltage_count		dw 0						; contador de segundos com tensao inadequada					
+	line_count				dw 0						; contador de linhas
+	str_line_count          DB 5 DUP(end_of_string), end_of_string ;conversao do numero de linhas para string
 	
 	in_buffer				DB 100 DUP(?)               ; Armazena os argumentos de entrada
 	input_file_name			DB 100 DUP(end_of_string)   ; Nome do arquivo de entrada
 	output_file_name		DB 100 DUP(end_of_string)   ; nome do arquivo de saida
 	voltage_atoi            DB 10 DUP(end_of_string)    ; string da voltagem
-	voltage					Dw 0                        ; voltagem
-	max_voltage				dw 0
-	min_voltage				dw 0
+	voltage					Dw 0                        ; tensao
+	max_voltage				dw 0                        ; tensao adequada maxima
+	min_voltage				dw 0					    ; tensao adequada minima
 
 	str_voltage_1			db 10 DUP(0),end_of_string                 ; string da primeira voltagem lida em cada linha
 	str_voltage_2			db 10 DUP(0),end_of_string                 ; string da segunda voltagem lida em cada linha
@@ -71,27 +67,26 @@
 	str_127					db "127",end_of_string
 	str_220					db "220",end_of_string
 
-	default_input_file_name DB "a.in",end_of_string
+	default_input_file_name  DB "a.in",end_of_string
 	default_output_file_name DB "a.out",end_of_string
 
-	msg_error_open_input_file		DB "Arquivo de entrada nao pode ser aberto.", end_of_string
-	msg_error_invalid_voltage DB "Valor de tensao incorreta.", end_of_string
-	msg_error_open_output_file   DB "Arquivo de saida nao pode ser aberto.", end_of_string
-	msg_error_couldnt_create_output DB "Arquivo de saida nao pode ser criado.", end_of_string
-	msg_error_couldnt_close_file DB "Nao foi possivel fechar um dos arquivos.", end_of_string
+	msg_error_open_input_file	     DB "Arquivo de entrada nao pode ser aberto.", end_of_string
+	msg_error_invalid_voltage		 DB "Valor de tensao incorreta.", end_of_string
+	msg_error_open_output_file  	 DB "Arquivo de saida nao pode ser aberto.", end_of_string
+	msg_error_couldnt_create_output  DB "Arquivo de saida nao pode ser criado.", end_of_string
+	msg_error_couldnt_close_file     DB "Nao foi possivel fechar um dos arquivos.", end_of_string
 
-	msg_space DB " ", end_of_string
-	msg_linha DB "Linha ",end_of_string
-	msg_invalido DB "Invalida: ", end_of_string
+	msg_space		 DB " ", end_of_string
+	msg_linha		 DB "Linha ",end_of_string
+	msg_invalido 	 DB "Invalida: ", end_of_string
 
-	msg_input DB "-i ",end_of_string
-	msg_voltage DB "-v ",end_of_string
-	msg_output DB "-o ", end_of_string
-	msg_read_time DB "Tempo de leitura: ",end_of_string
-	msg_good_voltage_time DB "Tempo com tensao valida: ",end_of_string
-	msg_no_voltage_time DB "Tempo sem tensao: ", end_of_string
-
-	msg_time_sep DB ":",end_of_string
+	msg_input 				DB "-i ",end_of_string
+	msg_voltage 			DB "-v ",end_of_string
+	msg_output 				DB "-o ", end_of_string
+	msg_read_time 			DB "Tempo de leitura: ",end_of_string
+	msg_good_voltage_time 	DB "Tempo com tensao valida: ",end_of_string
+	msg_no_voltage_time 	DB "Tempo sem tensao: ", end_of_string
+	msg_time_sep 			DB ":",end_of_string
 
 
 .CODE
@@ -101,7 +96,7 @@
 ;di <- destiny
 ;si <- source
 
-strcpy_s PROC NEAR
+strcpy_s PROC NEAR ;copia uma string de si para di até um espaço ou \0
 	mov bl, [si]
 	cmp bl, space
 	je ret_strcpy
@@ -121,17 +116,15 @@ strcpy_s PROC NEAR
 
 ;----------------------------------------------
 
-
-terminate PROC NEAR
+terminate PROC NEAR ;encerra o programa
 	mov ah, 4ch
 	mov al, 0
 	int 21H
 	ret
 	terminate ENDP
 
-
 ;----------------------------------------------
-get_argv PROC NEAR
+get_argv PROC NEAR ;funçao disponibilizada para ler cmdline
 
 	push ds ; Salva as informações de segmentos
 	push es
@@ -154,23 +147,18 @@ get_argv PROC NEAR
 	get_argv ENDP
 
 ;----------------------------------------------
-	printf_s	proc	near
+	printf_s	proc	near ;printf com quebra de linha
 
-	;	While (*s!='\0') {
 		mov		dl,[bx]
 		cmp		dl,0
 		je		ps_1
 
-	;		putchar(*s)
 		push	bx
 		mov		ah,2
 		int		21H
-		pop		bx
 
-	;		++s;
+		pop		bx
 		inc		bx
-			
-	;	}
 		jmp		printf_s
 			
 	ps_1:
@@ -186,58 +174,48 @@ get_argv PROC NEAR
 	printf_s	endp
 
 ;----------------------------------------------
-	printf	proc	near
-
-	;	While (*s!='\0') {
+	printf	proc	near ;funçao printf disponibilizada
 		mov		dl,[bx]
 		cmp		dl,0
 		je		ps_1_2
 
-	;		putchar(*s)
 		push	bx
 		mov		ah,2
 		int		21H
 		pop		bx
 
-	;		++s;
 		inc		bx
 			
-	;	}
 		jmp		printf
 			
 	ps_1_2:
 		ret
 		
 	printf	endp
-
 ;----------------------------------------------
-
-
-
-;----------------------------------------------
-get_tension PROC NEAR
+get_tension PROC NEAR ;procura o valor de tensao na linha de coando
 	lea si, in_buffer
 
-	get_tension_loop:
+	get_tension_loop:               
 		mov ah, [si]
 
-		cmp ah, end_of_string
-		JE voltage_not_found
+		cmp ah, end_of_string   ;se for \0, encerra a busca
+		JE voltage_not_found    
 
-		cmp ah, '-'
+		cmp ah, '-'             ;se for -, checa se é -v
 		JE	possible_argument3
 
 		inc si
 		jmp get_tension_loop
 
-		possible_argument3:
-			inc si
+		possible_argument3:    ;se for -v, começa a copiar
+			inc si             ;se nao, volta a buscar
 			mov ah, [si]
 			cmp ah, 'v'
 			je voltage_found
 			jmp get_tension_loop
 
-		voltage_found:
+		voltage_found:              ;se encontrou a tensao, copia ate o espaço
 			inc si
 			inc si
 			lea di, voltage_atoi
@@ -245,7 +223,7 @@ get_tension PROC NEAR
 			call strcpy_s
 			jmp ret_get_tension
 
-		voltage_not_found:
+		voltage_not_found:         ;se nao encontrou, usa o valor padrao 127
 			mov voltage, 127
 			lea di, voltage_atoi
 			lea si, str_127
@@ -257,30 +235,30 @@ get_tension PROC NEAR
 
 ;----------------------------------------------
 
-get_output_file_name PROC NEAR
+get_output_file_name PROC NEAR ;procura o nome do output na linha de comando
 	lea si, in_buffer
 
 	output_file_name_loop:
-		mov al, [si]
+		mov al, [si]                   
 
-		cmp al, end_of_string
+		cmp al, end_of_string          ;se for \0, para de procurar
 		JE output_file_name_not_found
 
-		cmp al, '-'
+		cmp al, '-'                    ;se for -, checa se é -o
 		JE possible_argument2
 
 		inc si
 		jmp output_file_name_loop
 
-		possible_argument2:
-			inc si
+		possible_argument2:            ;se for -o, começa a copiar o nome
+			inc si                     ;se nao, volta a buscar
 			mov al, [si]
 			cmp al, 'o'
 
 			je output_name_found
 			jmp output_file_name_loop
 
-		output_file_name_not_found:
+		output_file_name_not_found:          ;se nao achou o nome, usa o nome padrao
 			lea si, default_output_file_name
 			lea di, output_file_name
 
@@ -288,7 +266,7 @@ get_output_file_name PROC NEAR
 
 			jmp ret_get_file_name
 
-		output_name_found:
+		output_name_found:                  ;se achou o nome, copia ele até o espaço
 			inc si
 			inc si
 
@@ -303,16 +281,16 @@ get_output_file_name PROC NEAR
 
 ;----------------------------------------------
 
-get_file_name PROC NEAR
+get_file_name PROC NEAR ;procura o nome do arquivo na linha de comando
 	lea	si,	in_buffer
 
 	get_file_name_loop:
 		mov	al,	[si]
 
-		cmp al, end_of_string
+		cmp al, end_of_string           ;se encontrar \0, para a busca
 		JE	input_file_name_not_found
 
-		cmp	al, '-'
+		cmp	al, '-'                     ;se encontrar -, checa se é o argumento
 		JE	possible_argument
 
 		inc si
@@ -320,21 +298,21 @@ get_file_name PROC NEAR
 
 		possible_argument:
 			inc si
-			mov al, [si]
+			mov al, [si]                ;se for -i, pega a string, se não, volta a buscar
 			cmp al,	'i'
 			
 			JE input_found
 			JMP	get_file_name_loop
 
-		input_file_name_not_found:
-			lea si, default_input_file_name
+		input_file_name_not_found:          ;se não encontrar o -i, utiliza o nome default    
+			lea si, default_input_file_name 
 			lea di, input_file_name
 
-			call strcpy_s
+			call strcpy_s                    
 
 			jmp ret_get_file_name
 
-		input_found:
+		input_found:                  ;se encontrar, copia o nome até encontrar um espaço
 			inc si
 			inc si
 
@@ -355,7 +333,7 @@ open_input_file PROC NEAR
 	int 21H
 	mov bx, ax
 
-	jc perror_open_input_file
+	jc perror_open_input_file ;se nao for possivel abrir, retorna uma mensagem de erro e encerra
 	ret
 
 	perror_open_input_file:
@@ -371,7 +349,7 @@ open_input_file PROC NEAR
 
 ;----------------------------------------------
 
-open_output_file PROC NEAR
+open_output_file PROC NEAR ;abre o arquivo de saida para escrita
 	test al, al
 
 	mov al, 1							;abre no modo de escrita
@@ -379,10 +357,10 @@ open_output_file PROC NEAR
 	int 21H
 	mov bx, ax
 
-	jc try_create_output
+	jc try_create_output                ;tenta abrir, se nao conseguir, tenta criar
 	retry:
 
-	jc perror_open_output_file
+	jc perror_open_output_file          ;se tentou criar e nao funcionou, printa uma mensagem de erro e encerra
 	ret
 
 	try_create_output:
@@ -400,7 +378,7 @@ open_output_file PROC NEAR
 
 ;----------------------------------------------
 
-create_output_file PROC NEAR
+create_output_file PROC NEAR ;cria o arquivo de output se ele nao existir
 	test al, al
 	
 	lea dx, output_file_name
@@ -415,28 +393,20 @@ create_output_file PROC NEAR
 
 ;----------------------------------------------
 
-atoi	proc near
-		; A = 0;
+atoi	proc near     ;
 		mov		ax,0
 atoi_2:
-		; while (*S!='\0') {
 		cmp		byte ptr[bx], 0
 		jz		atoi_1
-		; 	A = 10 * A
 		mov		cx,10
 		mul		cx
-		; 	A = A + *S
 		mov		ch,0
 		mov		cl,[bx]
 		add		ax,cx
-		; 	A = A - '0'
 		sub		ax,'0'
-		; 	++S
 		inc		bx
-		;}
 		jmp		atoi_2
 atoi_1:
-		; return
 		ret
 atoi	endp
 
@@ -446,9 +416,9 @@ check_voltage_input PROC NEAR
 	push ax
 	mov ax, voltage
 
-	cmp ax, 127
-	je ret_check_voltage_127
-	cmp ax, 220
+	cmp ax, 127                ;checa se a voltagem e 127 ou 220
+	je ret_check_voltage_127   ;determina os limites aceitaveis de leitura
+	cmp ax, 220                ;se a voltagem nao for 127 ou 220, encerra com mensagem de erro
 	je ret_check_voltage_220
 
 	jmp invalid_voltage
@@ -479,7 +449,7 @@ advance_file_pointer PROC NEAR ;dx <- numero de bytes para avançar
 	mov ah, 42h
 	mov al, 1
 	mov bx, input_file_handle
-	mov cx, 0
+	;mov cx, 0
 	int 21H
 	ret
 
@@ -503,7 +473,7 @@ ascii_is_int PROC NEAR ;dl <- char
 
 ;----------------------------------------------
 letter_is_in_string PROC NEAR 		  ; dl <- char 
-	push ax
+	push ax							  ; retorna se um char esta na string, ou nao
 	push si                			  ; dh <- 1 se estiver, 0 caso contrario
 	mov si, 0						  ; bx <- ponteiro para string
 	loop_search_char:
@@ -533,33 +503,18 @@ letter_is_in_string PROC NEAR 		  ; dl <- char
 
 letter_is_in_string ENDP
 
-
 ;----------------------------------------------
-
-get_input_text PROC NEAR
-	mov ah, 3fh
-	mov cx, 10000
-	mov bx, input_file_handle
-	;lea dx, input_text
-	int 21h
-	ret
-
-get_input_text ENDP
-
-;----------------------------------------------
-;----------------------------------------------
-getline PROC NEAR
-
+getline PROC NEAR ;pega uma linha do arquivo de entrada
 	mov counter, 0
 
-	getchar_loop:
-		mov ah, 3fh
+	getchar_loop:                      
+		mov ah, 3fh                  
 		mov cx, 1
 		lea dx, char
 		mov bx, input_file_handle
 
 		test ax, ax
-		int 21H
+		int 21H                         ;getchar
 		mov read_bytes, ax
 		jc end_get_line
 
@@ -567,11 +522,11 @@ getline PROC NEAR
 
 		mov dl, char
 		
-		;cmp dl, 0
-		;je end_get_line
-		cmp dl, 0AH
+		cmp dl, 0
 		je end_get_line
-		cmp dl, 0DH
+		cmp dl, 0AH                   ; enquanto nao chegar no fim da linha,
+		je end_get_line               ; move o caractere encontrado para
+		cmp dl, 0DH                   ; input_file_line
 		je end_get_line
 
 		lea bx, input_file_line
@@ -583,16 +538,33 @@ getline PROC NEAR
 		inc counter
 		jmp getchar_loop
 
-	end_get_line:
-		mov byte ptr [bx+1], end_of_string
-		mov dx, 1
+	end_get_line:                     ;finaliza a string com \0
+		push bx
+
+		mov ah, 3fh                  
+		mov cx, 1
+		lea dx, char
+		mov bx, input_file_handle
+		int 21H                         ;getchar
+
+		cmp char, CR
+		je ret_get_line
+		cmp char, LF
+		je ret_get_line
+
+		mov dx, -1
+		mov cx, -1
 		call advance_file_pointer
+
+	ret_get_line:
+		pop bx
+		mov byte ptr [bx+1], end_of_string
 		ret
 getline ENDP
 
 ;----------------------------------------------
-close_file PROC NEAR ; <- bx file handle
-	mov ah, 3EH
+close_file PROC NEAR ; bx <- file handle
+	mov ah, 3EH      ; fecha o arquivo cujo handle esta em bx 
 	
 	cmp bx, 0 ;;aparentemente usar essa int com bx == 0 fecha o stdin?
 	je not_close
@@ -610,27 +582,27 @@ close_file PROC NEAR ; <- bx file handle
 	close_file ENDP
 
 ;----------------------------------------------
-get_voltage_readings PROC NEAR
+get_voltage_readings PROC NEAR ;procura as voltagens na linha do arquivo de entrada
 	lea bx, input_file_line
 	mov counter, 0
 
-	lea di, str_voltage_1
-	voltage_reading_loop_1:
-		mov byte ptr dl, [bx]
+	lea di, str_voltage_1      
+	voltage_reading_loop_1:    
+		mov byte ptr dl, [bx]  
 
-		cmp dl, 0
-		je end_reading_voltage
+		cmp dl, 0              ;se o char for fim da string, ou da linha, procura a proxima leitura
+		je end_reading_voltage 
 		cmp dl,cr
 		je end_reading_voltage
 		cmp dl,LF
 		je end_reading_voltage
 
-		call ascii_is_int
-		cmp si, 1
+		call ascii_is_int         ;se achar um numero...
+		cmp si, 1                 
 		je get_reading_1
 		inc bx
 		jmp voltage_reading_loop_1
-		get_reading_1:
+		get_reading_1:              ;continua lendo até o fim do numero
 			mov byte ptr [di], dl			
 			inc bx
 			inc di
@@ -646,10 +618,10 @@ get_voltage_readings PROC NEAR
 			call ascii_is_int
 			cmp si, 1
 			je get_reading_1
+                                              
+			mov byte ptr [di], end_of_string ;quando o numero acabar, bota \0
 
-			mov byte ptr [di], end_of_string
-
-			lea di, str_voltage_2
+			lea di, str_voltage_2            ;repete para as 2 proximas leituras
 			jmp voltage_reading_loop_2
 
 	voltage_reading_loop_2:
@@ -719,14 +691,15 @@ get_voltage_readings PROC NEAR
 			call ascii_is_int
 			cmp si, 1
 			je get_reading_3
-			mov [di], end_of_string
+
 	end_reading_voltage:
+		mov [di], end_of_string
 		ret
 get_voltage_readings ENDP
 
 ;----------------------------------------------
-convert_readings_to_int PROC NEAR
-	lea bx, str_voltage_1
+convert_readings_to_int PROC NEAR ; converte as leituras de tensao
+	lea bx, str_voltage_1         ; das linhas para numeros
 	call atoi
 	mov voltage_1, ax
 
@@ -738,29 +711,11 @@ convert_readings_to_int PROC NEAR
 	call atoi
 	mov voltage_3, ax
 
-	;mov ax, voltage_1
-	;lea bx, str_2
-	;call sprintf_w
-	;lea bx, str_2
-	;call printf
-
-		mov ax, voltage_2
-	;lea bx, str_2
-	;call sprintf_w
-	;lea bx, str_2
-	;call printf
-
-			mov ax, voltage_3
-	;lea bx, str_2
-	;call sprintf_w
-	;lea bx, str_2
-	;call printf_s
-
 	ret
 convert_readings_to_int ENDP
 
 ;----------------------------------------------
-check_invalid_line PROC NEAR
+check_invalid_line PROC NEAR ;ax <- 1 se a linha for invalida, 0 caso contrario
 
 	lea bx, input_file_line
 	dec bx
@@ -768,9 +723,9 @@ check_invalid_line PROC NEAR
 
 	search_space_num: ;checa a presença de espaços no meio de numeros
 	inc bx
-	mov dl, byte ptr [bx+2]                ;percorre a string pegando os digitos de 3 em 3
+	mov dl, byte ptr [bx+2]       ;percorre a string pegando os digitos de 3 em 3
 	cmp dl, end_of_string         ;se o do meio for um espaço e os outros dois forem numeros,
-	je stop_search              
+	je stop_search                ;a linha é invalida
 	call ascii_is_int
 	mov third_is_int, si
 		
@@ -781,29 +736,29 @@ check_invalid_line PROC NEAR
 	mov first_is_int, si
 
 	mov dl, byte ptr [bx+1]              ;se dl == space
-	cmp dl, end_of_string  		;dl = 1
+	cmp dl, end_of_string  				 ;dx = 1
 	je stop_search 
 	cmp dl, space
 	jne not_space
 	je is_space
 	
 	not_space:
-	mov dx, 0
-	jmp calc
+		mov dx, 0
+		jmp calc
 
 	is_space:
-	mov dx, 1
-	jmp calc
+		mov dx, 1
+		jmp calc
 
 	calc:
 	mov second_is_space, dx
 
 	mov ax, first_is_int ;se o primeiro e o terceiro forem int 
-	add ax, third_is_int
+	add ax, third_is_int ; e o segundo for espaço
 	add ax, second_is_space
 	
-	cmp ax, 3
-	je wrong_val
+	cmp ax, 3              
+	je wrong_val         ;a linha é inválida (tem espaço entre numeros)
 	jmp search_space_num
 
 	stop_search:
@@ -811,10 +766,11 @@ check_invalid_line PROC NEAR
 	mov cx, 0
 	mov dx, 0
 
-	count_commas:
-		lea bx, input_file_line
-		mov dl, byte [bx+si]
-
+	count_commas: ;conta a quantidade de virgulas numa linha
+		lea bx, input_file_line         ;while(dl != '\0'){
+										;	dl = str[i];
+		mov dl, byte [bx+si]            ;   if(dl == '-') counter++;
+										;   i++;
 		cmp dl, 0
 		je stop_counting_c
 
@@ -829,12 +785,11 @@ check_invalid_line PROC NEAR
 			inc si
 			jmp count_commas
 
-		stop_counting_c:
+		stop_counting_c: ;se nao tiver 2 virgulas, ta errado
 			cmp cx, 2
 			jne wrong_val
 
-
-	mov dx, voltage_1
+	mov dx, voltage_1  ;checa se as tensoes sao validas (menores que 500)
 	cmp voltage_1, 499
 	ja wrong_val
 
@@ -911,11 +866,11 @@ sw_continua2:
 sprintf_w	endp
 
 ;----------------------------------------------
-invalid_line_found PROC NEAR
-	lea bx, msg_linha
-	call printf
+invalid_line_found PROC NEAR ;encontrou uma linha invalida
+	lea bx, msg_linha        ;printa mensagem na tela
+	call printf              ;com conteudo correspondente
 
-	mov ax, line_count
+	mov ax, line_count     
 	dec ax
 	lea bx, str_line_count
 	call sprintf_w
@@ -932,16 +887,16 @@ invalid_line_found PROC NEAR
 	lea bx, input_file_line
 	call printf_s
 
-	inc input_file_is_invalid
-
+	inc input_file_is_invalid ;incrementa a flag de entrada invalida
+                              ;(nao importa a quantidade, apenas se é 0 ou 1)
 	ret
 
 invalid_line_found ENDP
 
 ;----------------------------------------------
-clear_voltage_strings PROC NEAR
-	mov counter, 0
-
+clear_voltage_strings PROC NEAR ;limpa as variaveis
+	mov counter, 0              ;que guardam as strings das leituras indivuais de cada linha
+ 
 	lea bx, str_voltage_1
 	clear_loop:
 		mov dl, byte ptr [bx]
@@ -983,7 +938,7 @@ clear_voltage_strings PROC NEAR
 clear_voltage_strings ENDP
 
 ;----------------------------------------------
-clear_line_input PROC NEAR
+clear_line_input PROC NEAR ;le a variavel que guarda a linha do arquivo de entrada
 	mov si, 0
 	lea bx, input_file_line
 
@@ -1000,13 +955,13 @@ clear_line_input PROC NEAR
 
 	clear_line_input ENDP
 ;----------------------------------------------
-fprintf PROC NEAR
+fprintf PROC NEAR ;dx <- str ptr
 	push si
 
 	mov si, 0
 	mov cx, 0
 	mov bx, dx
-	get_strlen:
+	get_strlen: ;pega o tamanho da string
 		mov ah, byte [bx+si]
 		cmp ah, 0
 		je end_strlen
@@ -1015,15 +970,13 @@ fprintf PROC NEAR
 		inc cx
 		jmp get_strlen
 
-	end_strlen:
+	end_strlen: ;printa a string no arquivo de acordo com a mediçao de seu tamanho
 	inc cx
-
 	mov ah, 40h
 	mov bx, output_file_handle
 	int 21h
-
+	
 	pop si
-
 	ret
 
 fprintf ENDP
@@ -1031,11 +984,9 @@ fprintf ENDP
 ;----------------------------------------------
 
 fprintf_s PROC NEAR ;dx <- str ptr
-	call fprintf
-
+	call fprintf    ;mesma coisa que o fprintf mas bota crlf
 	lea dx, str_CRLF
 	call fprintf
-
 	ret
 
 fprintf_s ENDP
@@ -1043,7 +994,7 @@ fprintf_s ENDP
 
 check_voltage_quality PROC 	NEAR
 
-check_no_voltage:
+check_no_voltage: ;checa se as 3 voltagens sao menores que 10
 	mov AX, voltage_1
 	cmp ax, 9
 	ja check_bad_voltage
@@ -1058,7 +1009,7 @@ check_no_voltage:
 	ret
 
 	check_bad_voltage:
-
+		;checa se as 3 voltagens estao no limite aceitavel
 		mov ax, voltage_1
 		cmp ax, max_voltage
 		ja bad_voltage_found
@@ -1362,7 +1313,7 @@ read_line_2:
 		mov bx, output_file_handle
 		lea dx, msg_no_voltage_time
 		call fprintf
-		;-----------------------------
+		;----------------------------- h
 		mov ax, no_time_h
 		lea bx, str_2
 		call sprintf_w
@@ -1393,31 +1344,10 @@ read_line_2:
 		mov bx, output_file_handle
 		lea dx, str_2
 		call fprintf_s
-
+		;-----------------------------
 		lea bx, msg_space
 		call printf
-
-		;mov ax, no_voltage_count
-		;lea bx, str_2
-		;;call sprintf_w
-		;mov bx, output_file_handle
-		;lea dx, str_2
-		;call fprintf_s
-
-		;mov ax, line_count
-		;lea bx, str_2
-		;call sprintf_w
-		;mov bx, output_file_handle
-		;lea dx, str_2
-		;call fprintf_s
-
-		;mov ax,bad_voltage_count
-		;lea bx, str_2
-		;call sprintf_w
-		;mov bx, output_file_handle
-		;lea dx, str_2
-		;call fprintf_s
-
+		;----------------------------- fecha o arquivo
 		mov bx, input_file_handle
 		call close_file
 		mov bx, output_file_handle
@@ -1425,9 +1355,6 @@ read_line_2:
 
 terminate_execution:
 .EXIT 0
-
-
-
 
 END
 	end
