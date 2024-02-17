@@ -70,11 +70,14 @@
 	default_input_file_name  DB "a.in",end_of_string
 	default_output_file_name DB "a.out",end_of_string
 
-	msg_error_open_input_file	     DB "Arquivo de entrada nao pode ser aberto.", end_of_string
-	msg_error_invalid_voltage		 DB "Valor de tensao incorreta.", end_of_string
+	msg_error_open_input_file	     DB "Arquivo de entrada nao existe ou nao pode ser aberto.", end_of_string
+	msg_error_invalid_voltage		 DB "Parametro da opcao [-v] deve ser 127 ou 220", end_of_string
 	msg_error_open_output_file  	 DB "Arquivo de saida nao pode ser aberto.", end_of_string
 	msg_error_couldnt_create_output  DB "Arquivo de saida nao pode ser criado.", end_of_string
 	msg_error_couldnt_close_file     DB "Nao foi possivel fechar um dos arquivos.", end_of_string
+	msg_error_missing_i_param		 DB "Opcao [-i] sem parametro", end_of_string
+	msg_error_missing_o_param		 DB "Opcao [-o] sem parametro", end_of_string
+	msg_error_missing_v_param		 DB "Opcao [-v] sem parametro", end_of_string
 
 	msg_space		 DB " ", end_of_string
 	msg_linha		 DB "Linha ",end_of_string
@@ -84,7 +87,7 @@
 	msg_voltage 			DB "-v ",end_of_string
 	msg_output 				DB "-o ", end_of_string
 	msg_read_time 			DB "Tempo de leitura: ",end_of_string
-	msg_good_voltage_time 	DB "Tempo com tensao valida: ",end_of_string
+	msg_good_voltage_time 	DB "Tempo com tensao de qualidade: ",end_of_string
 	msg_no_voltage_time 	DB "Tempo sem tensao: ", end_of_string
 	msg_time_sep 			DB ":",end_of_string
 
@@ -218,6 +221,15 @@ get_tension PROC NEAR ;procura o valor de tensao na linha de coando
 		voltage_found:              ;se encontrou a tensao, copia ate o espaço
 			inc si
 			inc si
+
+			mov al, [si]
+			cmp al, '-'
+			je missing_v
+			cmp al, space
+			je missing_v
+			cmp al, end_of_string
+			je missing_v
+
 			lea di, voltage_atoi
 
 			call strcpy_s
@@ -231,6 +243,13 @@ get_tension PROC NEAR ;procura o valor de tensao na linha de coando
 
 	ret_get_tension:
 		ret
+
+	missing_v:
+		lea bx, msg_error_missing_v_param
+		call printf_s
+
+		call terminate
+
 		get_tension ENDP
 
 ;----------------------------------------------
@@ -272,11 +291,24 @@ get_output_file_name PROC NEAR ;procura o nome do output na linha de comando
 
 			mov al, [si]
 
+			cmp al, '-'
+			je missing_out_file
+			cmp al, space
+			je missing_out_file
+			cmp al, end_of_string
+			je missing_out_file
+
 			lea di, output_file_name
 			call strcpy_s
 	
 	ret_get_output_name:
 		ret
+
+	missing_out_file:
+		lea bx, msg_error_missing_o_param
+		call printf_s
+
+		call terminate
 		get_output_file_name ENDP
 
 ;----------------------------------------------
@@ -315,13 +347,27 @@ get_file_name PROC NEAR ;procura o nome do arquivo na linha de comando
 		input_found:                  ;se encontrar, copia o nome até encontrar um espaço
 			inc si
 			inc si
+			mov al, [si]
+
+			cmp al, '-'
+			je missing_in_file
+			cmp al, space
+			je missing_in_file
+			cmp al, end_of_string
+			je missing_in_file
 
 			lea di, input_file_name
-
 			call strcpy_s
 
 		ret_get_file_name:
 			ret
+
+		missing_in_file:
+			lea bx, msg_error_missing_i_param
+			call printf_s
+
+			call terminate
+
 	get_file_name ENDP
 
 ;----------------------------------------------
@@ -350,17 +396,17 @@ open_input_file PROC NEAR
 ;----------------------------------------------
 
 open_output_file PROC NEAR ;abre o arquivo de saida para escrita
-	test al, al
-
 	mov al, 1							;abre no modo de escrita
 	mov ah, 3dh
+	
+	test al, al
 	int 21H
-	mov bx, ax
-
-	jc try_create_output                ;tenta abrir, se nao conseguir, tenta criar
+	
+	jc try_create_output                ;tenta abrir se nao conseguir, tenta criar
 	retry:
-
 	jc perror_open_output_file          ;se tentou criar e nao funcionou, printa uma mensagem de erro e encerra
+
+	mov bx, ax
 	ret
 
 	try_create_output:
@@ -386,7 +432,7 @@ create_output_file PROC NEAR ;cria o arquivo de output se ele nao existir
 	mov ah, 3ch
 	int 21H
 
-	mov ax, output_file_handle
+	mov bx, ax
 	ret
 
 	create_output_file ENDP
@@ -603,7 +649,7 @@ get_voltage_readings PROC NEAR ;procura as voltagens na linha do arquivo de entr
 		inc bx
 		jmp voltage_reading_loop_1
 		get_reading_1:              ;continua lendo até o fim do numero
-			mov byte ptr [di], dl			
+			mov byte ptr [di], dl	;(até o char lido não ser um numero)		
 			inc bx
 			inc di
 			mov byte ptr dl, [bx]
@@ -810,7 +856,7 @@ check_invalid_line PROC NEAR ;ax <- 1 se a linha for invalida, 0 caso contrario
 check_invalid_line ENDP
 
 ;----------------------------------------------
-sprintf_w	proc	near
+sprintf_w	proc	near ; ITOA - funcao disponibilizada no moodle
 ;void sprintf_w(char *string, WORD n) {
 	mov		sw_n,ax
 ;	k=5;
@@ -871,9 +917,9 @@ invalid_line_found PROC NEAR ;encontrou uma linha invalida
 	call printf              ;com conteudo correspondente
 
 	mov ax, line_count     
-	dec ax
-	lea bx, str_line_count
-	call sprintf_w
+	;dec ax                   ;no arquivo de definicao do trabalho, a primeira linha do arquivo e a linha 0
+	lea bx, str_line_count    ;mas nos casos de teste a primeira linha e a linha 1
+	call sprintf_w            ;REVISAR	
 
 	lea bx, str_line_count
 	call printf
@@ -1274,6 +1320,41 @@ read_line_2:
 		mov bx, output_file_handle
 		lea dx, voltage_atoi
 		call fprintf_s
+		;----------------------------- tempo total
+		mov bx, output_file_handle
+		lea dx, msg_read_time
+		call fprintf
+		;----------------------------- h
+		mov ax, time_h
+		lea bx, str_2
+		call sprintf_w
+		mov bx, output_file_handle
+		lea dx, str_2
+		call fprintf
+		;----------------------------- :
+		mov bx, output_file_handle
+		lea dx, msg_time_sep
+		call fprintf
+		;----------------------------- min
+		mov ax, 0
+		mov al, time_min
+		lea bx, str_2
+		call sprintf_w
+		mov bx, output_file_handle
+		lea dx, str_2
+		call fprintf
+		;----------------------------- :
+		mov bx, output_file_handle
+		lea dx, msg_time_sep
+		call fprintf
+		;----------------------------- seg
+		mov ax, 0
+		mov al, time_seg
+		lea bx, str_2
+		call sprintf_w
+		mov bx, output_file_handle
+		lea dx, str_2
+		call fprintf_s
 		;----------------------------- tempo com voltagem boa
 		mov bx, output_file_handle
 		lea dx, msg_good_voltage_time
@@ -1352,6 +1433,8 @@ read_line_2:
 		call close_file
 		mov bx, output_file_handle
 		call close_file
+		lea bx, msg_space
+		call printf
 
 terminate_execution:
 .EXIT 0
