@@ -1,0 +1,6 @@
+-i in7.txt
+-o a.out
+-v 220
+Tempo de leitura: 0:0:26
+Tempo com tensao de qualidade: 0:0:19
+Tempo sem tensao: 0:0:7
